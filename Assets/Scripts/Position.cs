@@ -1,12 +1,12 @@
 public struct Pos
 {
-    public Pos(int y, int x)
+    public Pos(int x, int y)
     {
         this.x = x;
         this.y = y;
     }
-    public int x { get; set; }
-    public int y { get; set; }
+    public int x;
+    public int y;
     public override readonly string ToString() => $"({y}, {x})";
 
     public override bool Equals(object obj)
@@ -23,7 +23,7 @@ public struct Pos
             return false;
         }
         Pos other = (Pos)obj;
-        return this.x == other.x && this.y == other.y;
+        return x == other.x && y == other.y;
     }
     public override readonly int GetHashCode()
     {

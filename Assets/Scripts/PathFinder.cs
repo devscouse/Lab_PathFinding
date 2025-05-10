@@ -1,151 +1,114 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class PathFinder
 {
-    public bool mazeSolved = false;
 
-    private float startDelay;
-    private float stepDelay;
-    public Maze maze;
+    private readonly NodeGrid grid;
+    private readonly Node targetNode;
+    private Node currNode;
 
-    private LinkedList<Node> openNodes;
-    private Pos currPos;
-    private int[,] posOffsets = {
+    private readonly List<Node> openNodes;
+    private readonly int[,] posOffsets = {
         {-1, -1},
-        {-1, 1},
         {-1, 0},
-        {1, -1},
-        {1, 1},
-        {1, 0},
+        {-1, 1},
         {0, -1},
+        {0, 0},
         {0, 1},
+        {1, -1},
+        {1, 0},
+        {1, -1},
     };
-    private int maxF = 100;
 
-    private struct Node
+    public bool finished;
+    public bool solved;
+
+    public PathFinder(NodeGrid grid, Vector3 startPos, Vector3 targetPos)
     {
-        public int g;
-        public int h;
-        public int f;
-        public Pos pos;
-
-        public Node(int g, int h, Pos pos)
-        {
-            this.g = g;
-            this.h = h;
-            this.pos = pos;
-            this.f = g + h;
-        }
-        public override readonly string ToString() => $"(pos={pos}, g={g}, h={h}, f={f})";
-        public readonly Color GetColor(int maxF)
-        {
-            return new Color(f / Math.Max(maxF, f), 0, 0);
-        }
-
+        this.grid = grid;
+        currNode = grid.GetNode(startPos);
+        targetNode = grid.GetNode(targetPos);
+        openNodes = new();
     }
 
-    public PathFinder(Maze maze, float startDelay, float stepDelay)
+    public void Step()
     {
-        this.maze = maze;
-        this.startDelay = startDelay;
-        this.stepDelay = stepDelay;
-        this.openNodes = new LinkedList<Node>();
-        this.currPos = maze.startPos;
-    }
+        Debug.Log("PathFinder.Step from node at position " + currNode.gridPos);
 
-
-    public void AStarStep()
-    {
-        if (currPos.Equals(maze.targetPos)) { mazeSolved = true; }
-
-        // Calculate valid nodes around current position and add to openNodes
-        Pos nodePos;
+        // Evaluate the 8 nodes around the currNode
         Node node;
-        GridSquare gs;
-
-        gs = maze.GetGridSquare(currPos);
-        if (!gs.CheckStatus(GridSquare.Status.Start)) { gs.SetStatus(GridSquare.Status.Closed); }
-
         for (int i = 0; i < 8; i++)
         {
-            nodePos = new(currPos.y + posOffsets[i, 0], currPos.x + posOffsets[i, 1]);
-            if (nodePos.x < 0 || nodePos.y < 0 || nodePos.x >= maze.width || nodePos.y >= maze.height)
+            node = grid.GetNode(currNode.gridPos.x + posOffsets[i, 0], currNode.gridPos.y + posOffsets[i, 1]);
+
+            // If the node is closed or cannot be traversed then continue
+            if (node.status == Node.Status.closed || node.status == Node.Status.blocked) { continue; }
+
+            // If the node is the target node we have solved the maze
+            if (node == targetNode)
             {
-                continue;
-            }
-            gs = maze.GetGridSquare(nodePos);
-            if (gs.CheckStatus(GridSquare.Status.Target))
-            {
-                Debug.Log("Maze is solved!");
-                mazeSolved = true;
+                finished = true;
+                solved = true;
+                SetPathTaken(node);
                 return;
             }
-            else if (!gs.CheckStatus(GridSquare.Status.Traversable))
+
+            // Add to the openNodes
+            node.status = Node.Status.open;
+            int gCost = node.gCost + GetDistance(node, node);
+            if (gCost < node.gCost || !openNodes.Contains(node))
             {
-                continue;
-            }
-            node = new(CalculateG(nodePos, currPos), CalculateH(nodePos), nodePos);
-            gs.SetStatus(GridSquare.Status.Open, node.GetColor(maxF));
+                node.gCost = gCost;
+                node.hCost = GetDistance(node, targetNode);
+                node.parent = currNode;
 
-            // Insert the new node into openNodes before the first node with a greater f score
-            LinkedListNode<Node> other = openNodes.First;
-            while (true)
-            {
-                if (other == null)
+                if (!openNodes.Contains(node))
                 {
-                    openNodes.AddLast(node);
-                    break;
+                    openNodes.Add(node);
                 }
-
-                // Put the node before the first node with a higher F cost
-                // If there is a node with an identical F cost then the node with the lowest
-                // H cost should come first
-                if (node.f < other.Value.f || (node.f == other.Value.f && node.h < other.Value.h))
-                {
-                    openNodes.AddBefore(other, node);
-                    break;
-                }
-                other = other.Next;
-
             }
         }
-        if (openNodes.Count == 0) { mazeSolved = true; }
 
-
-        // Move current position to best node
-        currPos = openNodes.First.Value.pos;
-        maxF = openNodes.First.Value.f;
-        openNodes.RemoveFirst();
-
-    }
-
-    int CalculateG(Pos nodePos, Pos currPos)
-    {
-        int xDiff = nodePos.x - currPos.x;
-        int yDiff = nodePos.y - currPos.y;
-        return (xDiff * xDiff) + (yDiff * yDiff);
-    }
-
-    int CalculateH(Pos nodePos)
-    {
-        int xDiff = nodePos.x - maze.targetPos.x;
-        int yDiff = nodePos.y - maze.targetPos.y;
-        return (xDiff * xDiff) + (yDiff * yDiff);
-    }
-
-    public IEnumerator PathFinderRoutine(Action PathFinderStepFunc)
-    {
-        yield return new WaitForSeconds(startDelay);
-        while (!mazeSolved)
+        // If we have no open nodes to explore the maze is unsolvable
+        if (openNodes.Count == 0)
         {
-            yield return new WaitForSeconds(stepDelay);
-            PathFinderStepFunc();
+            finished = true;
+            return;
         }
 
+        // Select the node with the lowest FCost
+        currNode.status = Node.Status.closed;
+        currNode = openNodes[0];
+        for (int i = 1; i < openNodes.Count; i++)
+        {
+            if (openNodes[i].FCost() <= currNode.FCost() && openNodes[i].hCost < currNode.hCost)
+            {
+                currNode = openNodes[i];
+            }
+        }
+        openNodes.Remove(currNode);
     }
 
+    void SetPathTaken(Node endNode)
+    {
+        Node node = endNode;
+        while (node != null)
+        {
+            node.status = Node.Status.path;
+            node = node.parent;
+        }
+    }
+
+    int GetDistance(Node self, Node other)
+    {
+        int distX = Math.Abs(self.gridPos.x - other.gridPos.y);
+        int distY = Math.Abs(self.gridPos.y - other.gridPos.y);
+
+        if (distX > distY)
+            return 14 * distY + 10 * (distX - distY);
+        return 14 * distX + 10 * (distY - distX);
+    }
 
 }

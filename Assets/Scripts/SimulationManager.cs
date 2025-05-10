@@ -1,83 +1,121 @@
-using System;
+using System.Collections;
+using TMPro;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 public class SimulationManager : MonoBehaviour
 {
-    private Maze maze;
-    private PathFinder pathFinder;
-
     public GameObject mainCamera;
-    public GameObject gridSquarePrefab;
-    public float gridSquarePadding;
-    public float obstacleChance;
-    public int width;
-    public int height;
+    public GameObject maze;
+    public PathFinder pathFinder;
+    public Texture2D mazeImage;
+
+    public TextMeshProUGUI instructionText;
+    private float lastInputTime;
+    private bool startPlacement;
+    private bool targetPlacement;
+
     public float startDelay;
     public float stepDelay;
 
-    private float squareHeight;
-    private float squareWidth;
+    private MazeImageLoader mazeImageLoader;
+    private NodeGrid nodeGrid;
+    private Vector3 startPos;
+    private Vector3 targetPos;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        Renderer gsRender = gridSquarePrefab.GetComponent<Renderer>();
-        squareHeight = gsRender.bounds.size.z + gridSquarePadding;
-        squareWidth = gsRender.bounds.size.x + gridSquarePadding;
+        mazeImageLoader = maze.GetComponent<MazeImageLoader>();
+        mazeImageLoader.LoadImageToTexture(mazeImage);
 
-        float xPos = (squareWidth + gridSquarePadding) * width / 2;
-        float zPos = (squareHeight + gridSquarePadding) * height / 2;
-        float fov = mainCamera.GetComponent<Camera>().fieldOfView;
-        float cameraHeight = (float)Math.Max(
-            zPos / Math.Tan(fov / 2),
-            xPos / Math.Tan(Camera.VerticalToHorizontalFieldOfView(fov, Camera.main.aspect) / 2)
-        );
-        mainCamera.transform.position = new Vector3(xPos, cameraHeight, zPos);
+        // FrameObjectInCamera(maze, mainCamera.GetComponent<Camera>());
 
+        nodeGrid = maze.GetComponent<NodeGrid>();
+        nodeGrid.CreateNodeGrid();
 
-        maze = new Maze(width, height);
-        GenerateMaze(maze);
-
-        pathFinder = new PathFinder(maze, startDelay, stepDelay);
-        StartCoroutine(pathFinder.PathFinderRoutine(pathFinder.AStarStep));
+        startPlacement = true;
+        targetPlacement = false;
+        instructionText.text = "Please select a start point";
     }
 
-    int GetRandomGridRow() { return UnityEngine.Random.Range(0, height); }
-    int GetRandomGridCol() { return UnityEngine.Random.Range(0, width); }
-
-    void GenerateMaze(Maze maze)
+    void FrameObjectInCamera(GameObject obj, Camera camera)
     {
-        Vector3 gridPos;
-        GridSquare gridSquare;
+        Bounds bounds = obj.GetComponent<Renderer>().bounds;
+        float cameraDistance = 2.0f; // Constant factor
+        Vector3 objectSizes = bounds.max - bounds.min;
+        float objectSize = Mathf.Max(objectSizes.x, objectSizes.y, objectSizes.z);
+        float cameraView = 2.0f * Mathf.Tan(0.5f * Mathf.Deg2Rad * camera.fieldOfView); // Visible height 1 meter in front
+        float distance = cameraDistance * objectSize / cameraView; // Combined wanted distance from the object
+        distance += 0.2f * objectSize; // Estimated offset from the center to the outside of the object
+        camera.transform.position = bounds.center - distance * camera.transform.forward;
+    }
 
-        for (int row = 0; row < maze.height; row++)
+    void Update()
+    {
+        if ((Time.time - lastInputTime > 1) && (startPlacement || targetPlacement) && Input.GetAxisRaw("Fire1") > 0)
         {
-            for (int col = 0; col < maze.width; col++)
+            lastInputTime = Time.time;
+            Ray ray = mainCamera.GetComponent<Camera>().ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit) && hit.collider.gameObject == maze)
             {
-                gridPos = new(col * squareWidth + squareWidth / 2, 0, row * squareHeight + squareHeight / 2);
-                gridSquare = Instantiate(gridSquarePrefab, gridPos, gridSquarePrefab.transform.rotation).GetComponent<GridSquare>();
-                if (UnityEngine.Random.Range(0, 1f) < obstacleChance)
+                if (startPlacement)
                 {
-                    gridSquare.GetComponent<GridSquare>().SetStatus(GridSquare.Status.Blocked);
+                    startPos = hit.point;
+                    Debug.Log("startPos set to " + startPos);
+
+                    startPlacement = false;
+                    targetPlacement = true;
+                    instructionText.text = "Please select a target point";
+                    return;
                 }
-                else
+
+                if (targetPlacement)
                 {
-                    gridSquare.GetComponent<GridSquare>().SetStatus(GridSquare.Status.Traversable);
-                    Debug.Log("Adding Traversable GridSquare...");
+                    targetPos = hit.point;
+                    Debug.Log("targetPos set to " + targetPos);
+
+                    targetPlacement = false;
+                    instructionText.text = "";
+                    pathFinder = new PathFinder(nodeGrid, startPos, targetPos);
+                    StartCoroutine(PathFinderRoutine(pathFinder));
+                    return;
                 }
-                maze.SetGridSquare(row, col, gridSquare);
             }
+
         }
-        // Create a random start and random target
-        Pos startPos = new(GetRandomGridRow(), UnityEngine.Random.Range(0, Math.Min(10, width)));
-        maze.GetGridSquare(startPos).SetStatus(GridSquare.Status.Start);
-        maze.startPos = startPos;
+    }
 
-        Pos targetPos = new(GetRandomGridRow(), UnityEngine.Random.Range(Math.Max(0, width - 10), width));
-        maze.GetGridSquare(targetPos).SetStatus(GridSquare.Status.Target);
-        maze.targetPos = targetPos;
+    void OnDrawGizmos()
+    {
+        if (startPos != null)
+        {
+            Gizmos.color = Color.blue;
+            Gizmos.DrawSphere(startPos, 1);
+        }
+        if (targetPos != null)
+        {
+            Gizmos.color = Color.green;
+            Gizmos.DrawSphere(targetPos, 1);
+        }
+    }
 
+    public IEnumerator PathFinderRoutine(PathFinder pathFinder)
+    {
+        yield return new WaitForSeconds(startDelay);
+        while (!pathFinder.finished)
+        {
+            yield return new WaitForSeconds(stepDelay);
+            pathFinder.Step();
+        }
+
+        if (pathFinder.solved)
+        {
+            instructionText.text = "MAZE SOLVED";
+        }
+        else
+        {
+            instructionText.text = "Couldn't solve it, sorry :(";
+        }
 
     }
+
 }
