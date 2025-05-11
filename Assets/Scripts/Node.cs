@@ -27,4 +27,6 @@ public class Node
     }
 
     public int FCost() { return gCost + hCost; }
+    public float NormGCost() { return gCost / 5000; }
+    public float NormHCost() { return hCost / 5000; }
 }

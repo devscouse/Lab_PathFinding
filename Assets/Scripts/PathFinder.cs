@@ -30,6 +30,7 @@ public class PathFinder
         this.grid = grid;
         currNode = grid.GetNode(startPos);
         targetNode = grid.GetNode(targetPos);
+        Debug.Log("PathFinder.targetNode at position " + targetNode.gridPos);
         openNodes = new();
     }
 
@@ -57,11 +58,11 @@ public class PathFinder
 
             // Add to the openNodes
             node.status = Node.Status.open;
-            int gCost = node.gCost + GetDistance(node, node);
+            int gCost = currNode.gCost + GetManhattanDistance(currNode, node);
             if (gCost < node.gCost || !openNodes.Contains(node))
             {
                 node.gCost = gCost;
-                node.hCost = GetDistance(node, targetNode);
+                node.hCost = GetManhattanDistance(node, targetNode);
                 node.parent = currNode;
 
                 if (!openNodes.Contains(node))
@@ -69,6 +70,7 @@ public class PathFinder
                     openNodes.Add(node);
                 }
             }
+            Debug.Log($"Node at {node.gridPos} has hCost {node.hCost}, gCost {node.gCost}, fCost {node.FCost()}");
         }
 
         // If we have no open nodes to explore the maze is unsolvable
@@ -101,7 +103,7 @@ public class PathFinder
         }
     }
 
-    int GetDistance(Node self, Node other)
+    int GetSebastianDistance(Node self, Node other)
     {
         int distX = Math.Abs(self.gridPos.x - other.gridPos.y);
         int distY = Math.Abs(self.gridPos.y - other.gridPos.y);
@@ -109,6 +111,12 @@ public class PathFinder
         if (distX > distY)
             return 14 * distY + 10 * (distX - distY);
         return 14 * distX + 10 * (distY - distX);
+    }
+
+    // TODO: Implement
+    int GetManhattanDistance(Node self, Node other)
+    {
+        return Math.Abs(self.gridPos.x - other.gridPos.y) + Math.Abs(self.gridPos.x - other.gridPos.y);
     }
 
 }

@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class NodeGrid : MonoBehaviour
 {
-    private Node[,] grid;
+    public Node[,] grid;
     private Vector3 worldAnchor;
     private Vector3 worldSize;
 
@@ -11,7 +11,7 @@ public class NodeGrid : MonoBehaviour
     private int gridHeight;
 
     public float nodeRadius;
-    private float nodeDiameter;
+    public float nodeDiameter;
 
     public Material mazeMaterial;
 
@@ -38,9 +38,10 @@ public class NodeGrid : MonoBehaviour
         return gridPos;
     }
 
-    public void CreateNodeGrid()
+    public void CreateNodeGrid(float nodeSize)
     {
         worldSize = GetComponent<MeshRenderer>().bounds.size;
+        nodeRadius = nodeSize;
         nodeDiameter = nodeRadius * 2;
 
         gridWidth = Mathf.RoundToInt(worldSize.x / nodeDiameter);
@@ -69,28 +70,4 @@ public class NodeGrid : MonoBehaviour
     public Node GetNode(int x, int y) { return grid[Math.Clamp(y, 0, gridHeight), Math.Clamp(x, 0, gridWidth)]; }
     public Node GetNode(Pos p) { return GetNode(p.x, p.y); }
     public Node GetNode(Vector3 worldPos) { return GetNode(GetGridPos(worldPos)); }
-
-    void OnDrawGizmos()
-    {
-        if (grid == null)
-            return;
-
-        foreach (Node node in grid)
-        {
-            if (node.status == Node.Status.blocked || node.status == Node.Status.traversable)
-            {
-                continue;
-            }
-            var c = node.status switch
-            {
-                Node.Status.open => Color.yellow,
-                Node.Status.closed => Color.red,
-                Node.Status.path => Color.blue,
-                _ => Color.black,
-            };
-            Gizmos.color = c;
-            Gizmos.DrawCube(node.worldPos, new Vector3(nodeDiameter, 1, nodeDiameter) * .9f);
-        }
-
-    }
 }

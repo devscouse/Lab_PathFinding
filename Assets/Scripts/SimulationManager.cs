@@ -1,6 +1,7 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class SimulationManager : MonoBehaviour
 {
@@ -8,19 +9,22 @@ public class SimulationManager : MonoBehaviour
     public GameObject maze;
     public PathFinder pathFinder;
     public Texture2D mazeImage;
-
-    public TextMeshProUGUI instructionText;
-    private float lastInputTime;
-    private bool startPlacement;
-    private bool targetPlacement;
+    public UI ui;
 
     public float startDelay;
     public float stepDelay;
+    public float costScale;
+    public float nodeSize = 0.5f;
 
     private MazeImageLoader mazeImageLoader;
     private NodeGrid nodeGrid;
     private Vector3 startPos;
     private Vector3 targetPos;
+
+    private float lastInputTime;
+    private bool acceptingStartInput;
+    private bool acceptingTargetInput;
+    private bool simulationRunning;
 
     void Start()
     {
@@ -29,13 +33,68 @@ public class SimulationManager : MonoBehaviour
 
         // FrameObjectInCamera(maze, mainCamera.GetComponent<Camera>());
 
-        nodeGrid = maze.GetComponent<NodeGrid>();
-        nodeGrid.CreateNodeGrid();
 
-        startPlacement = true;
-        targetPlacement = false;
-        instructionText.text = "Please select a start point";
     }
+
+    public void StartSimulation()
+    {
+        nodeGrid = maze.GetComponent<NodeGrid>();
+        nodeGrid.CreateNodeGrid(nodeSize);
+
+        pathFinder = new PathFinder(nodeGrid, startPos, targetPos);
+        simulationRunning = true;
+        ui.stopStartButton.GetComponent<Image>().color = Color.red;
+        ui.stopStartButton.GetComponentInChildren<TextMeshProUGUI>().text = "Stop";
+        StartCoroutine(PathFinderRoutine(pathFinder));
+    }
+
+    public void StopSimulation()
+    {
+        simulationRunning = false;
+        ui.stopStartButton.GetComponent<Image>().color = Color.green;
+        ui.stopStartButton.GetComponentInChildren<TextMeshProUGUI>().text = "Start";
+    }
+
+    public void HandleUiNodeSizeChanged()
+    {
+        StopSimulation();
+        nodeSize = ui.nodeSizeSlider.value;
+    }
+
+    public void HandleUiStepDelayChanged()
+    {
+        stepDelay = ui.stepDelaySlider.value;
+    }
+
+    bool CursorOnMaze(out Vector3 hitPos)
+    {
+        Ray ray = mainCamera.GetComponent<Camera>().ScreenPointToRay(Input.mousePosition);
+        bool hitRes = Physics.Raycast(ray, out RaycastHit hit);
+        hitPos = hit.point;
+        if (hitRes && hit.collider.gameObject == maze) { return true; }
+        return false;
+    }
+
+    public void HandleSelectStartPoint()
+    {
+        StopSimulation();
+        acceptingStartInput = true;
+        lastInputTime = Time.time;
+    }
+
+    public void HandleSelectTargetPoint()
+    {
+        StopSimulation();
+        acceptingTargetInput = true;
+        lastInputTime = Time.time;
+    }
+
+    public void HandleStartStopEvent()
+    {
+        if (simulationRunning) { StopSimulation(); }
+        else { StartSimulation(); }
+    }
+
 
     void FrameObjectInCamera(GameObject obj, Camera camera)
     {
@@ -49,39 +108,28 @@ public class SimulationManager : MonoBehaviour
         camera.transform.position = bounds.center - distance * camera.transform.forward;
     }
 
+
+    float NormCost(int cost)
+    {
+        return Mathf.Clamp01(cost / costScale);
+    }
+
     void Update()
     {
-        if ((Time.time - lastInputTime > 1) && (startPlacement || targetPlacement) && Input.GetAxisRaw("Fire1") > 0)
+        if ((acceptingStartInput || acceptingTargetInput) && Time.time - lastInputTime > 1 && Input.GetAxisRaw("Fire1") > 0)
         {
-            lastInputTime = Time.time;
-            Ray ray = mainCamera.GetComponent<Camera>().ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit) && hit.collider.gameObject == maze)
+            if (acceptingStartInput)
             {
-                if (startPlacement)
-                {
-                    startPos = hit.point;
-                    Debug.Log("startPos set to " + startPos);
-
-                    startPlacement = false;
-                    targetPlacement = true;
-                    instructionText.text = "Please select a target point";
-                    return;
-                }
-
-                if (targetPlacement)
-                {
-                    targetPos = hit.point;
-                    Debug.Log("targetPos set to " + targetPos);
-
-                    targetPlacement = false;
-                    instructionText.text = "";
-                    pathFinder = new PathFinder(nodeGrid, startPos, targetPos);
-                    StartCoroutine(PathFinderRoutine(pathFinder));
-                    return;
-                }
+                CursorOnMaze(out startPos);
+                acceptingStartInput = false;
             }
-
+            else if (acceptingTargetInput)
+            {
+                CursorOnMaze(out targetPos);
+                acceptingTargetInput = false;
+            }
         }
+
     }
 
     void OnDrawGizmos()
@@ -96,26 +144,47 @@ public class SimulationManager : MonoBehaviour
             Gizmos.color = Color.green;
             Gizmos.DrawSphere(targetPos, 1);
         }
+        if (nodeGrid != null)
+        {
+            foreach (Node node in nodeGrid.grid)
+            {
+                if (node.status == Node.Status.blocked || node.status == Node.Status.traversable)
+                {
+                    continue;
+                }
+                var c = node.status switch
+                {
+                    Node.Status.open => Color.yellow,
+                    Node.Status.closed => new Color(1 - NormCost(node.FCost()), 1 - NormCost(node.gCost), 1 - NormCost(node.hCost)),
+                    Node.Status.path => Color.blue,
+                    _ => Color.black,
+                };
+                Gizmos.color = c;
+                Gizmos.DrawCube(node.worldPos, new Vector3(nodeGrid.nodeDiameter, 1, nodeGrid.nodeDiameter));
+            }
+        }
     }
 
     public IEnumerator PathFinderRoutine(PathFinder pathFinder)
     {
         yield return new WaitForSeconds(startDelay);
-        while (!pathFinder.finished)
+        while (!pathFinder.finished && simulationRunning)
         {
             yield return new WaitForSeconds(stepDelay);
             pathFinder.Step();
         }
 
-        if (pathFinder.solved)
+        if (pathFinder.finished)
         {
-            instructionText.text = "MAZE SOLVED";
+            if (pathFinder.solved)
+            {
+                ui.ShowToast("Maze Solved :)", Color.green);
+            }
+            else
+            {
+                ui.ShowToast("Maze Unsolved :(", Color.red);
+            }
         }
-        else
-        {
-            instructionText.text = "Couldn't solve it, sorry :(";
-        }
-
     }
 
 }
