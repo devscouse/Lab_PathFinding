@@ -7,18 +7,21 @@ using UnityEngine.UI;
 public class UI : MonoBehaviour
 {
 
-    public Slider stepDelaySlider;
-    public Slider nodeSizeSlider;
+    [Header("Map Controls")]
+    public TMP_Dropdown mapSelector;
+    public Slider brushSizeSlider;
+    public Toggle brushToggle;
+    public Toggle eraseToggle;
+
+    [Header("Simulation Controls")]
     public Button selectStartButton;
     public Button selectTargetButton;
     public Button stopStartButton;
+    public Slider stepDelaySlider;
+    public Slider nodeSizeSlider;
+
+    [Header("User Notification")]
     public GameObject toastPanel;
-
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-
-    }
 
     public void ShowToast(String toastText, Color toastColor)
     {
@@ -45,5 +48,4 @@ public class UI : MonoBehaviour
         yield return new WaitForSeconds(seconds);
         HideToast();
     }
-
 }

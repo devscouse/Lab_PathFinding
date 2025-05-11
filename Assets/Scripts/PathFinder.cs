@@ -40,29 +40,30 @@ public class PathFinder
 
         // Evaluate the 8 nodes around the currNode
         Node node;
+        int x, y;
         for (int i = 0; i < 8; i++)
         {
-            node = grid.GetNode(currNode.gridPos.x + posOffsets[i, 0], currNode.gridPos.y + posOffsets[i, 1]);
+            Debug.Log("Evaluating neighbour " + i);
+            x = currNode.gridPos.x + posOffsets[i, 0];
+            y = currNode.gridPos.y + posOffsets[i, 1];
+            if (x < 0 || x >= grid.GetGridWidth() || y < 0 || y >= grid.GetGridHeight())
+            {
+                Debug.Log("Neighbour off grid");
+                continue;
+            }
+            node = grid.GetNode(x, y);
 
             // If the node is closed or cannot be traversed then continue
             if (node.status == Node.Status.closed || node.status == Node.Status.blocked) { continue; }
 
-            // If the node is the target node we have solved the maze
-            if (node == targetNode)
-            {
-                finished = true;
-                solved = true;
-                SetPathTaken(node);
-                return;
-            }
 
             // Add to the openNodes
             node.status = Node.Status.open;
-            int gCost = currNode.gCost + GetManhattanDistance(currNode, node);
+            int gCost = currNode.gCost + GetSebastianDistance(currNode, node);
             if (gCost < node.gCost || !openNodes.Contains(node))
             {
                 node.gCost = gCost;
-                node.hCost = GetManhattanDistance(node, targetNode);
+                node.hCost = GetSebastianDistance(node, targetNode);
                 node.parent = currNode;
 
                 if (!openNodes.Contains(node))
@@ -90,11 +91,20 @@ public class PathFinder
                 currNode = openNodes[i];
             }
         }
+        // If the node is the target node we have solved the maze
+        if (currNode == targetNode)
+        {
+            finished = true;
+            solved = true;
+            // SetPathTaken(currNode);
+            return;
+        }
         openNodes.Remove(currNode);
     }
 
     void SetPathTaken(Node endNode)
     {
+        Debug.Log("Backtracking for path-taken to get to " + endNode);
         Node node = endNode;
         while (node != null)
         {

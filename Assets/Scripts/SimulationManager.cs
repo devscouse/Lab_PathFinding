@@ -6,7 +6,7 @@ using UnityEngine.UI;
 public class SimulationManager : MonoBehaviour
 {
     public GameObject mainCamera;
-    public GameObject maze;
+    public GameObject map;
     public PathFinder pathFinder;
     public Texture2D mazeImage;
     public UI ui;
@@ -14,9 +14,9 @@ public class SimulationManager : MonoBehaviour
     public float startDelay;
     public float stepDelay;
     public float costScale;
-    public float nodeSize = 0.5f;
+    private float nodeSize = 0.5f;
 
-    private MazeImageLoader mazeImageLoader;
+    private MapTextureHandler mapTex;
     private NodeGrid nodeGrid;
     private Vector3 startPos;
     private Vector3 targetPos;
@@ -26,11 +26,14 @@ public class SimulationManager : MonoBehaviour
     private bool acceptingTargetInput;
     private bool simulationRunning;
 
+    private int brushSize;
+    private Color brushColor;
+    private bool acceptingDrawInput;
+
     void Start()
     {
-        mazeImageLoader = maze.GetComponent<MazeImageLoader>();
-        mazeImageLoader.LoadImageToTexture(mazeImage);
-
+        mapTex = map.GetComponent<MapTextureHandler>();
+        SetTextureFromMapSelector();
         // FrameObjectInCamera(maze, mainCamera.GetComponent<Camera>());
 
 
@@ -38,7 +41,7 @@ public class SimulationManager : MonoBehaviour
 
     public void StartSimulation()
     {
-        nodeGrid = maze.GetComponent<NodeGrid>();
+        nodeGrid = map.GetComponent<NodeGrid>();
         nodeGrid.CreateNodeGrid(nodeSize);
 
         pathFinder = new PathFinder(nodeGrid, startPos, targetPos);
@@ -55,6 +58,21 @@ public class SimulationManager : MonoBehaviour
         ui.stopStartButton.GetComponentInChildren<TextMeshProUGUI>().text = "Start";
     }
 
+    private void SetTextureFromMapSelector()
+    {
+        if (ui.mapSelector.value == 1)
+        {
+            Debug.Log("Loading Maze texture...");
+            mapTex.LoadTexture(mazeImage);
+        }
+        else
+        {
+            Debug.Log("Resetting map texture...");
+            mapTex.ResetTexture();
+        }
+    }
+    public void HandleMapSelectorChanged() { SetTextureFromMapSelector(); }
+
     public void HandleUiNodeSizeChanged()
     {
         StopSimulation();
@@ -66,12 +84,31 @@ public class SimulationManager : MonoBehaviour
         stepDelay = ui.stepDelaySlider.value;
     }
 
+    public void HandleUiEditMapInputChanges()
+    {
+        brushSize = (int)ui.brushSizeSlider.value;
+        if (ui.brushToggle.isOn)
+        {
+            acceptingDrawInput = true;
+            brushColor = Color.black;
+        }
+        else if (ui.eraseToggle.isOn)
+        {
+            acceptingDrawInput = true;
+            brushColor = Color.white;
+        }
+        else
+        {
+            acceptingDrawInput = false;
+        }
+    }
+
     bool CursorOnMaze(out Vector3 hitPos)
     {
         Ray ray = mainCamera.GetComponent<Camera>().ScreenPointToRay(Input.mousePosition);
         bool hitRes = Physics.Raycast(ray, out RaycastHit hit);
         hitPos = hit.point;
-        if (hitRes && hit.collider.gameObject == maze) { return true; }
+        if (hitRes && hit.collider.gameObject == map) { return true; }
         return false;
     }
 
@@ -116,17 +153,25 @@ public class SimulationManager : MonoBehaviour
 
     void Update()
     {
-        if ((acceptingStartInput || acceptingTargetInput) && Time.time - lastInputTime > 1 && Input.GetAxisRaw("Fire1") > 0)
+        if ((acceptingStartInput || acceptingTargetInput || acceptingDrawInput) && Time.time - lastInputTime > 1 && Input.GetAxisRaw("Fire1") > 0)
         {
-            if (acceptingStartInput)
+            if (CursorOnMaze(out Vector3 hitPos))
             {
-                CursorOnMaze(out startPos);
-                acceptingStartInput = false;
-            }
-            else if (acceptingTargetInput)
-            {
-                CursorOnMaze(out targetPos);
-                acceptingTargetInput = false;
+                if (acceptingStartInput)
+                {
+                    startPos = hitPos;
+                    acceptingStartInput = false;
+                }
+                else if (acceptingTargetInput)
+                {
+                    targetPos = hitPos;
+                    acceptingTargetInput = false;
+                }
+                else if (acceptingDrawInput)
+                {
+                    mapTex.SetPixelsAroundWorldPos(hitPos, brushSize, brushColor);
+                }
+
             }
         }
 
@@ -144,7 +189,7 @@ public class SimulationManager : MonoBehaviour
             Gizmos.color = Color.green;
             Gizmos.DrawSphere(targetPos, 1);
         }
-        if (nodeGrid != null)
+        if (nodeGrid != null && nodeGrid.grid != null)
         {
             foreach (Node node in nodeGrid.grid)
             {
@@ -155,13 +200,13 @@ public class SimulationManager : MonoBehaviour
                 var c = node.status switch
                 {
                     Node.Status.open => Color.yellow,
-                    Node.Status.closed => new Color(1 - NormCost(node.FCost()), 1 - NormCost(node.gCost), 1 - NormCost(node.hCost)),
+                    Node.Status.closed => Color.red,
                     Node.Status.path => Color.blue,
                     Node.Status.traversable => Color.green,
                     _ => Color.black,
                 };
                 Gizmos.color = c;
-                Gizmos.DrawCube(node.worldPos, new Vector3(nodeGrid.nodeDiameter, 1, nodeGrid.nodeDiameter));
+                Gizmos.DrawCube(node.worldPos, new Vector3(nodeGrid.nodeRadius * 2, 1, nodeGrid.nodeRadius * 2));
             }
         }
     }

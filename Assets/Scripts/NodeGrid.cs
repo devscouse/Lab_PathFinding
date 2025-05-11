@@ -12,51 +12,21 @@ public class NodeGrid : MonoBehaviour
     private int gridHeight;
 
     public float nodeRadius;
-    public float nodeDiameter;
+    private float nodeDiameter;
 
-    public Material mazeMaterial;
-
-    Vector2Int ToPixelPos(Vector3 worldPos, Texture2D tex)
-    {
-        Vector3 localPos = transform.InverseTransformPoint(worldPos);
-        float normX = -localPos.x / transform.localScale.x + 0.5f;
-        float normY = -localPos.z / transform.localScale.z + 0.5f;
-
-        int pixelX = Mathf.RoundToInt(Mathf.Clamp(normX * tex.width, 0, tex.width));
-        int pixelY = Mathf.RoundToInt(Mathf.Clamp(normY * tex.height, 0, tex.height));
-        return new Vector2Int(pixelX, pixelY);
-    }
-
+    public int GetGridWidth() { return gridWidth; }
+    public int GetGridHeight() { return gridHeight; }
 
     float SampleObstacleTexture(Vector3 worldPos)
     {
-        Texture2D tex = (Texture2D)mazeMaterial.mainTexture;
-        Vector2Int centerPixelPos = ToPixelPos(worldPos, tex);
-
-        int[,] offsets = {
-            {1, 1},
-            {1, -1},
-            {-1, 1},
-            {-1, -1},
-        };
-
-        // Average the pixel values for the node
+        MapTextureHandler mapTex = GetComponent<MapTextureHandler>();
+        Texture2D tex = mapTex.GetTexture();
+        List<Vector2Int> pixelPoints = mapTex.GetPixelPointsAroundWorldPos(worldPos, (int)(nodeRadius * 10));
         List<float> values = new();
-        for (int x = 0; x < nodeRadius; x++)
+        foreach (Vector2Int pixelPos in pixelPoints)
         {
-            for (int y = 0; y < nodeRadius; y++)
-            {
-                if (x * x + y * y > nodeRadius * nodeRadius)
-                    continue;
-
-                for (int i = 0; i < 4; i++)
-                {
-                    float value = tex.GetPixel(centerPixelPos.x + (x * offsets[i, 0]), centerPixelPos.y + (y * offsets[i, 1])).grayscale;
-                    values.Add(value);
-                }
-            }
+            values.Add(tex.GetPixel(pixelPos.x, pixelPos.y).grayscale);
         }
-
         float valueSum = 0;
         foreach (float val in values) { valueSum += val; }
         return valueSum / values.Count;
@@ -73,6 +43,7 @@ public class NodeGrid : MonoBehaviour
 
     public void CreateNodeGrid(float nodeSize)
     {
+        Debug.Log($"CreateNodeGrid({nodeSize})");
         worldSize = GetComponent<MeshRenderer>().bounds.size;
         nodeRadius = nodeSize;
         nodeDiameter = nodeRadius * 2;
@@ -98,6 +69,7 @@ public class NodeGrid : MonoBehaviour
                 grid[y, x] = node;
             }
         }
+        Debug.Log($"CreateNodeGrid({nodeSize}) complete");
     }
 
     public Node GetNode(int x, int y) { return grid[Math.Clamp(y, 0, gridHeight), Math.Clamp(x, 0, gridWidth)]; }
