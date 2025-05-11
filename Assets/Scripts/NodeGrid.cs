@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class NodeGrid : MonoBehaviour
@@ -15,18 +16,50 @@ public class NodeGrid : MonoBehaviour
 
     public Material mazeMaterial;
 
-    float SampleObstacleTexture(Vector3 worldPos)
+    Vector2Int ToPixelPos(Vector3 worldPos, Texture2D tex)
     {
         Vector3 localPos = transform.InverseTransformPoint(worldPos);
         float normX = -localPos.x / transform.localScale.x + 0.5f;
         float normY = -localPos.z / transform.localScale.z + 0.5f;
 
-        Texture2D obstacleTexture = (Texture2D)mazeMaterial.mainTexture;
-        int pixelX = Mathf.RoundToInt(Mathf.Clamp(normX * obstacleTexture.width, 0, obstacleTexture.width));
-        int pixelY = Mathf.RoundToInt(Mathf.Clamp(normY * obstacleTexture.height, 0, obstacleTexture.height));
+        int pixelX = Mathf.RoundToInt(Mathf.Clamp(normX * tex.width, 0, tex.width));
+        int pixelY = Mathf.RoundToInt(Mathf.Clamp(normY * tex.height, 0, tex.height));
+        return new Vector2Int(pixelX, pixelY);
+    }
 
-        float value = obstacleTexture.GetPixel(pixelX, pixelY).grayscale;
-        return value;
+
+    float SampleObstacleTexture(Vector3 worldPos)
+    {
+        Texture2D tex = (Texture2D)mazeMaterial.mainTexture;
+        Vector2Int centerPixelPos = ToPixelPos(worldPos, tex);
+
+        int[,] offsets = {
+            {1, 1},
+            {1, -1},
+            {-1, 1},
+            {-1, -1},
+        };
+
+        // Average the pixel values for the node
+        List<float> values = new();
+        for (int x = 0; x < nodeRadius; x++)
+        {
+            for (int y = 0; y < nodeRadius; y++)
+            {
+                if (x * x + y * y > nodeRadius * nodeRadius)
+                    continue;
+
+                for (int i = 0; i < 4; i++)
+                {
+                    float value = tex.GetPixel(centerPixelPos.x + (x * offsets[i, 0]), centerPixelPos.y + (y * offsets[i, 1])).grayscale;
+                    values.Add(value);
+                }
+            }
+        }
+
+        float valueSum = 0;
+        foreach (float val in values) { valueSum += val; }
+        return valueSum / values.Count;
     }
 
     public Pos GetGridPos(Vector3 worldPos)

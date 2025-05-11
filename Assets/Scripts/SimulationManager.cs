@@ -148,7 +148,7 @@ public class SimulationManager : MonoBehaviour
         {
             foreach (Node node in nodeGrid.grid)
             {
-                if (node.status == Node.Status.blocked || node.status == Node.Status.traversable)
+                if (node.status == Node.Status.blocked)
                 {
                     continue;
                 }
@@ -157,6 +157,7 @@ public class SimulationManager : MonoBehaviour
                     Node.Status.open => Color.yellow,
                     Node.Status.closed => new Color(1 - NormCost(node.FCost()), 1 - NormCost(node.gCost), 1 - NormCost(node.hCost)),
                     Node.Status.path => Color.blue,
+                    Node.Status.traversable => Color.green,
                     _ => Color.black,
                 };
                 Gizmos.color = c;
