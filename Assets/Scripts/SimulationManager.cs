@@ -202,7 +202,7 @@ public class SimulationManager : MonoBehaviour
         {
             foreach (Node node in nodeGrid.grid)
             {
-                if (node.status == Node.Status.blocked)
+                if (node.status == Node.Status.blocked || node.status == Node.Status.traversable)
                 {
                     continue;
                 }

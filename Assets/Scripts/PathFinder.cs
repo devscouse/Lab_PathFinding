@@ -15,7 +15,6 @@ public class PathFinder
         {-1, 0},
         {-1, 1},
         {0, -1},
-        {0, 0},
         {0, 1},
         {1, -1},
         {1, 0},
@@ -104,17 +103,17 @@ public class PathFinder
 
     void SetPathTaken(Node endNode)
     {
+        int recursionLimit = 10000;
         Debug.Log("Backtracking for path-taken to get to " + endNode);
         Node node = endNode;
-        Debug.Log("endNode " + node);
-        Debug.Log("endNode.parent " + node.parent);
         node.status = Node.Status.path;
 
-        // while (node != null)
-        // {
-        //     node.status = Node.Status.path;
-        //     node = node.parent;
-        // }
+        while (node != null && recursionLimit-- > 0)
+        {
+            Debug.Log("node " + node.gridPos);
+            node.status = Node.Status.path;
+            node = node.parent;
+        }
     }
 
     int GetSebastianDistance(Node self, Node other)
