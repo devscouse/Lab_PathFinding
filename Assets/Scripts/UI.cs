@@ -20,6 +20,11 @@ public class UI : MonoBehaviour
     public Slider stepDelaySlider;
     public Slider nodeSizeSlider;
 
+    [Header("Visal Controls")]
+    public Slider fCostFactorSlider;
+    public Slider gCostFactorSlider;
+    public Slider hCostFactorSlider;
+
     [Header("User Notification")]
     public GameObject toastPanel;
 

@@ -177,6 +177,15 @@ public class SimulationManager : MonoBehaviour
 
     }
 
+    Color GetNodeColor(Node node)
+    {
+        return new Color(
+            1 - (node.FCost() * ui.fCostFactorSlider.value),
+            1 - (node.gCost * ui.gCostFactorSlider.value),
+            1 - (node.hCost * ui.hCostFactorSlider.value)
+        );
+    }
+
     void OnDrawGizmos()
     {
         if (startPos != null)
@@ -200,7 +209,7 @@ public class SimulationManager : MonoBehaviour
                 var c = node.status switch
                 {
                     Node.Status.open => Color.yellow,
-                    Node.Status.closed => Color.red,
+                    Node.Status.closed => GetNodeColor(node),
                     Node.Status.path => Color.blue,
                     Node.Status.traversable => Color.green,
                     _ => Color.black,

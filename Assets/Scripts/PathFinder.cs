@@ -59,11 +59,11 @@ public class PathFinder
 
             // Add to the openNodes
             node.status = Node.Status.open;
-            int gCost = currNode.gCost + GetSebastianDistance(currNode, node);
+            int gCost = currNode.gCost + GetManhattanDistance(currNode, node);
             if (gCost < node.gCost || !openNodes.Contains(node))
             {
                 node.gCost = gCost;
-                node.hCost = GetSebastianDistance(node, targetNode);
+                node.hCost = GetManhattanDistance(node, targetNode);
                 node.parent = currNode;
 
                 if (!openNodes.Contains(node))
@@ -96,7 +96,7 @@ public class PathFinder
         {
             finished = true;
             solved = true;
-            // SetPathTaken(currNode);
+            SetPathTaken(currNode);
             return;
         }
         openNodes.Remove(currNode);
@@ -106,16 +106,20 @@ public class PathFinder
     {
         Debug.Log("Backtracking for path-taken to get to " + endNode);
         Node node = endNode;
-        while (node != null)
-        {
-            node.status = Node.Status.path;
-            node = node.parent;
-        }
+        Debug.Log("endNode " + node);
+        Debug.Log("endNode.parent " + node.parent);
+        node.status = Node.Status.path;
+
+        // while (node != null)
+        // {
+        //     node.status = Node.Status.path;
+        //     node = node.parent;
+        // }
     }
 
     int GetSebastianDistance(Node self, Node other)
     {
-        int distX = Math.Abs(self.gridPos.x - other.gridPos.y);
+        int distX = Math.Abs(self.gridPos.x - other.gridPos.x);
         int distY = Math.Abs(self.gridPos.y - other.gridPos.y);
 
         if (distX > distY)
@@ -123,10 +127,9 @@ public class PathFinder
         return 14 * distX + 10 * (distY - distX);
     }
 
-    // TODO: Implement
     int GetManhattanDistance(Node self, Node other)
     {
-        return Math.Abs(self.gridPos.x - other.gridPos.y) + Math.Abs(self.gridPos.x - other.gridPos.y);
+        return Math.Abs(self.gridPos.x - other.gridPos.x) + Math.Abs(self.gridPos.y - other.gridPos.y);
     }
 
 }
