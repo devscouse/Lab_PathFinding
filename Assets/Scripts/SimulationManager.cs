@@ -10,6 +10,8 @@ public class SimulationManager : MonoBehaviour
     public PathFinder pathFinder;
     public Texture2D mazeImage;
     public UI ui;
+    public GameObject startFlag;
+    public GameObject targetFlag;
 
     public float startDelay;
     public float stepDelay;
@@ -18,6 +20,7 @@ public class SimulationManager : MonoBehaviour
 
     private MapTextureHandler mapTex;
     private NodeGrid nodeGrid;
+    private NodeShaderManager nodeShader;
     private Vector3 startPos;
     private Vector3 targetPos;
 
@@ -34,17 +37,17 @@ public class SimulationManager : MonoBehaviour
     {
         mapTex = map.GetComponent<MapTextureHandler>();
         SetTextureFromMapSelector();
-        // FrameObjectInCamera(maze, mainCamera.GetComponent<Camera>());
-
-
+        nodeShader = GetComponent<NodeShaderManager>();
     }
 
     public void StartSimulation()
     {
         nodeGrid = map.GetComponent<NodeGrid>();
         nodeGrid.CreateNodeGrid(nodeSize);
+        nodeShader.ResetTextures();
 
         pathFinder = new PathFinder(nodeGrid, startPos, targetPos);
+        pathFinder.NodeExplored += nodeShader.UpdateNodeTextures;
         simulationRunning = true;
         ui.stopStartButton.GetComponent<Image>().color = Color.red;
         ui.stopStartButton.GetComponentInChildren<TextMeshProUGUI>().text = "Stop";
@@ -132,25 +135,6 @@ public class SimulationManager : MonoBehaviour
         else { StartSimulation(); }
     }
 
-
-    void FrameObjectInCamera(GameObject obj, Camera camera)
-    {
-        Bounds bounds = obj.GetComponent<Renderer>().bounds;
-        float cameraDistance = 2.0f; // Constant factor
-        Vector3 objectSizes = bounds.max - bounds.min;
-        float objectSize = Mathf.Max(objectSizes.x, objectSizes.y, objectSizes.z);
-        float cameraView = 2.0f * Mathf.Tan(0.5f * Mathf.Deg2Rad * camera.fieldOfView); // Visible height 1 meter in front
-        float distance = cameraDistance * objectSize / cameraView; // Combined wanted distance from the object
-        distance += 0.2f * objectSize; // Estimated offset from the center to the outside of the object
-        camera.transform.position = bounds.center - distance * camera.transform.forward;
-    }
-
-
-    float NormCost(int cost)
-    {
-        return Mathf.Clamp01(cost / costScale);
-    }
-
     void Update()
     {
         if ((acceptingStartInput || acceptingTargetInput || acceptingDrawInput) && Time.time - lastInputTime > 1 && Input.GetAxisRaw("Fire1") > 0)
@@ -160,11 +144,15 @@ public class SimulationManager : MonoBehaviour
                 if (acceptingStartInput)
                 {
                     startPos = hitPos;
+                    startFlag.transform.position = startPos;
+                    startFlag.SetActive(true);
                     acceptingStartInput = false;
                 }
                 else if (acceptingTargetInput)
                 {
                     targetPos = hitPos;
+                    targetFlag.transform.position = targetPos;
+                    targetFlag.SetActive(true);
                     acceptingTargetInput = false;
                 }
                 else if (acceptingDrawInput)
@@ -177,68 +165,23 @@ public class SimulationManager : MonoBehaviour
 
     }
 
-    Color GetNodeColor(Node node)
-    {
-        return new Color(
-            1 - (node.FCost() * ui.fCostFactorSlider.value),
-            1 - (node.gCost * ui.gCostFactorSlider.value),
-            1 - (node.hCost * ui.hCostFactorSlider.value)
-        );
-    }
-
-    void OnDrawGizmos()
-    {
-        if (startPos != null)
-        {
-            Gizmos.color = Color.blue;
-            Gizmos.DrawSphere(startPos, 1);
-        }
-        if (targetPos != null)
-        {
-            Gizmos.color = Color.green;
-            Gizmos.DrawSphere(targetPos, 1);
-        }
-        if (nodeGrid != null && nodeGrid.grid != null)
-        {
-            foreach (Node node in nodeGrid.grid)
-            {
-                if (node.status == Node.Status.blocked || node.status == Node.Status.traversable)
-                {
-                    continue;
-                }
-                var c = node.status switch
-                {
-                    Node.Status.open => Color.yellow,
-                    Node.Status.closed => GetNodeColor(node),
-                    Node.Status.path => Color.blue,
-                    Node.Status.traversable => Color.green,
-                    _ => Color.black,
-                };
-                Gizmos.color = c;
-                Gizmos.DrawCube(node.worldPos, new Vector3(nodeGrid.nodeRadius * 2, 1, nodeGrid.nodeRadius * 2));
-            }
-        }
-    }
 
     public IEnumerator PathFinderRoutine(PathFinder pathFinder)
     {
+        pathFinder.state = PathFinder.State.running;
         yield return new WaitForSeconds(startDelay);
-        while (!pathFinder.finished && simulationRunning)
+        while (pathFinder.state == PathFinder.State.running && simulationRunning)
         {
             yield return new WaitForSeconds(stepDelay);
             pathFinder.Step();
         }
-
-        if (pathFinder.finished)
+        if (pathFinder.state == PathFinder.State.solved)
         {
-            if (pathFinder.solved)
-            {
-                ui.ShowToast("Maze Solved :)", Color.green);
-            }
-            else
-            {
-                ui.ShowToast("Maze Unsolved :(", Color.red);
-            }
+            ui.ShowToast("Maze Solved :)", Color.green);
+        }
+        else if (pathFinder.state == PathFinder.State.unsolved)
+        {
+            ui.ShowToast("Maze Unsolved :(", Color.red);
         }
     }
 

@@ -4,11 +4,19 @@ using UnityEngine;
 
 public class PathFinder
 {
-
+    public enum State
+    {
+        running,
+        solved,
+        unsolved,
+        waiting,
+    };
+    public State state = State.waiting;
     private readonly NodeGrid grid;
     private readonly Node targetNode;
     private Node currNode;
 
+    public event Action NodeExplored;
     private readonly List<Node> openNodes;
     private readonly int[,] posOffsets = {
         {-1, -1},
@@ -20,9 +28,6 @@ public class PathFinder
         {1, 0},
         {1, -1},
     };
-
-    public bool finished;
-    public bool solved;
 
     public PathFinder(NodeGrid grid, Vector3 startPos, Vector3 targetPos)
     {
@@ -36,20 +41,17 @@ public class PathFinder
     public void Step()
     {
         Debug.Log("PathFinder.Step from node at position " + currNode.gridPos);
+        state = State.running;
 
         // Evaluate the 8 nodes around the currNode
         Node node;
         int x, y;
         for (int i = 0; i < 8; i++)
         {
-            Debug.Log("Evaluating neighbour " + i);
             x = currNode.gridPos.x + posOffsets[i, 0];
             y = currNode.gridPos.y + posOffsets[i, 1];
             if (x < 0 || x >= grid.GetGridWidth() || y < 0 || y >= grid.GetGridHeight())
-            {
-                Debug.Log("Neighbour off grid");
                 continue;
-            }
             node = grid.GetNode(x, y);
 
             // If the node is closed or cannot be traversed then continue
@@ -76,42 +78,52 @@ public class PathFinder
         // If we have no open nodes to explore the maze is unsolvable
         if (openNodes.Count == 0)
         {
-            finished = true;
+            state = State.unsolved;
             return;
         }
 
         // Select the node with the lowest FCost
         currNode.status = Node.Status.closed;
-        currNode = openNodes[0];
-        for (int i = 1; i < openNodes.Count; i++)
-        {
-            if (openNodes[i].FCost() <= currNode.FCost() && openNodes[i].hCost < currNode.hCost)
-            {
-                currNode = openNodes[i];
-            }
-        }
+        currNode = GetBestOpenNode();
+
         // If the node is the target node we have solved the maze
         if (currNode == targetNode)
         {
-            finished = true;
-            solved = true;
+            state = State.solved;
             SetPathTaken(currNode);
             return;
         }
-        openNodes.Remove(currNode);
+    }
+
+    Node GetBestOpenNode()
+    {
+        Node node = openNodes[0];
+        for (int i = 1; i < openNodes.Count; i++)
+        {
+            if (openNodes[i].FCost() <= node.FCost() && openNodes[i].hCost < node.hCost)
+            {
+                node = openNodes[i];
+            }
+        }
+        openNodes.Remove(node);
+        node.timeExplored = Time.time;
+        grid.lastExploredNode = node;
+        NodeExplored?.Invoke();
+        return node;
     }
 
     void SetPathTaken(Node endNode)
     {
         int recursionLimit = 10000;
-        Debug.Log("Backtracking for path-taken to get to " + endNode);
         Node node = endNode;
-        node.status = Node.Status.path;
-
-        while (node != null && recursionLimit-- > 0)
+        while (node.parent != null && recursionLimit-- > 0)
         {
-            Debug.Log("node " + node.gridPos);
             node.status = Node.Status.path;
+            node.timeExplored = Time.time;
+            grid.lastExploredNode = node;
+            Debug.Log($"Node {node.gridPos} is part of the path");
+            NodeExplored?.Invoke();
+            Debug.Log($"Check this is called after texture is updated");
             node = node.parent;
         }
     }

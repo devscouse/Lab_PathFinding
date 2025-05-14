@@ -5,6 +5,7 @@ using UnityEngine;
 public class NodeGrid : MonoBehaviour
 {
     public Node[,] grid;
+    public Node lastExploredNode;
     private Vector3 worldAnchor;
     private Vector3 worldSize;
 

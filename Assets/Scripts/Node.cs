@@ -17,6 +17,7 @@ public class Node
     public Pos gridPos;
     public Status status;
     public Node parent;
+    public float timeExplored = 0f;
 
     public Node(Vector3 worldPos, float traversalCost, float maxTraversalCost)
     {
