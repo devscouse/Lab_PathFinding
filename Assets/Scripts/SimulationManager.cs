@@ -93,12 +93,12 @@ public class SimulationManager : MonoBehaviour
         if (ui.brushToggle.isOn)
         {
             acceptingDrawInput = true;
-            brushColor = Color.black;
+            brushColor = Color.white;
         }
         else if (ui.eraseToggle.isOn)
         {
             acceptingDrawInput = true;
-            brushColor = Color.white;
+            brushColor = Color.black;
         }
         else
         {
@@ -137,7 +137,7 @@ public class SimulationManager : MonoBehaviour
 
     void Update()
     {
-        if ((acceptingStartInput || acceptingTargetInput || acceptingDrawInput) && Time.time - lastInputTime > 1 && Input.GetAxisRaw("Fire1") > 0)
+        if ((acceptingStartInput || acceptingTargetInput || acceptingDrawInput) && Input.GetAxisRaw("Fire1") > 0)
         {
             if (CursorOnMaze(out Vector3 hitPos))
             {

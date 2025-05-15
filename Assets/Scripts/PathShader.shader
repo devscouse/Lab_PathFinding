@@ -2,8 +2,9 @@ Shader "Unlit/NodeShader"
 {
     Properties
     {
-        _GradientTex ("Gradient Texture", 2D) = "white" {}
         _NodeInfoTex ("_NodeInfoTex", 2D) = "black" {}
+        _PathColor ("Path Color", Color) = (1,1,0,1)
+        _Outline ("Outline Size", Float) = 1
         _CurrTime ("Global Time", Float) = 0
         _FadeTime ("Fade Time", Float) = 5
     }
@@ -53,19 +54,30 @@ Shader "Unlit/NodeShader"
                 return o;
             }
 
+            float sampleAlpha(float2 uv) {
+                return tex2D(_NodeInfoTex, uv).a;
+            }
+
             fixed4 frag (v2f i) : SV_Target
             {
                 float4 nodeData = tex2D(_NodeInfoTex, i.uv);
                 float exploredTime = nodeData.a * 255.0;
+                float isPath = nodeData.r;
 
-                if (exploredTime <= 0.001) {
+                if (isPath <= 1) {
                     discard;
                 }
+
                 float age = _CurrTime - exploredTime;
                 float fade = clamp(1.0 - (age / _FadeTime), 0.1, 1);
-
-                float gradientIndex = saturate(age / 255.0);
-                float3 baseColor = tex2D(_GradientTex, float2(gradientIndex, 0.5));
+                
+                float3 baseColor;
+                if (isPath == 1) {
+                    baseColor = float4(0.4, 0.3, 1, 1);
+                } else {
+                    float gradientIndex = saturate(age / 255.0);
+                    baseColor = tex2D(_GradientTex, float2(gradientIndex, 0.5));
+                }
                 return float4(baseColor * fade, fade);
             }
             ENDCG

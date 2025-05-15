@@ -23,6 +23,11 @@ public class NodeShaderManager : MonoBehaviour
         vizMaterial.renderQueue = 2450;
     }
 
+    void Update()
+    {
+        vizMaterial.SetFloat("_CurrTime", Time.time);
+    }
+
     public void ResetTextures()
     {
         if (nodeGrid.grid == null)
@@ -34,7 +39,7 @@ public class NodeShaderManager : MonoBehaviour
 
         nodeInfoTex = new Texture2D(width, height, TextureFormat.RGBA32, false)
         {
-            filterMode = FilterMode.Point,
+            filterMode = FilterMode.Bilinear,
             wrapMode = TextureWrapMode.Clamp
         };
 
@@ -50,8 +55,7 @@ public class NodeShaderManager : MonoBehaviour
         }
         nodeInfoTex.Apply();
         vizMaterial.SetTexture("_NodeInfoTex", nodeInfoTex);
-        vizMaterial.SetFloat("_CurrTime", Time.time);
-        vizMaterial.SetFloat("_FadeTime", 5f);
+        vizMaterial.SetFloat("_FadeTime", 10f);
     }
 
     public void SetNodeInfoTexPixel(Node node, Color color)

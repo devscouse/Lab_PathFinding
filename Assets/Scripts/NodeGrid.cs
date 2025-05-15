@@ -65,7 +65,7 @@ public class NodeGrid : MonoBehaviour
                     + Vector3.forward * (y * nodeDiameter + nodeRadius)
                 );
 
-                Node node = new(nodePos, 1 - SampleObstacleTexture(nodePos), 0.7f);
+                Node node = new(nodePos, SampleObstacleTexture(nodePos), 0.7f);
                 node.gridPos = new Pos(x, y);
                 grid[y, x] = node;
             }

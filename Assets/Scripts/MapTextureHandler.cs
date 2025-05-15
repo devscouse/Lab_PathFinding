@@ -15,14 +15,23 @@ public class MapTextureHandler : MonoBehaviour
     public void ResetTexture()
     {
         mapMaterial.color = Color.white;
-        mapMaterial.mainTexture = new Texture2D(textureSize.x, textureSize.y);
+        Texture2D tex = new Texture2D(textureSize.x, textureSize.y);
+        for (int x = 0; x < textureSize.x; x++)
+        {
+            for (int y = 0; y < textureSize.y; y++)
+            {
+                tex.SetPixel(x, y, Color.black);
+            }
+        }
+        tex.Apply();
+        mapMaterial.mainTexture = tex;
     }
 
-    public void LoadTexture(Texture2D mazeTexture)
+    public void LoadTexture(Texture2D tex)
     {
-        textureSize.x = mazeTexture.width;
-        textureSize.y = mazeTexture.height;
-        mapMaterial.mainTexture = mazeTexture;
+        textureSize.x = tex.width;
+        textureSize.y = tex.height;
+        mapMaterial.mainTexture = tex;
     }
 
     public Texture2D GetTexture()
